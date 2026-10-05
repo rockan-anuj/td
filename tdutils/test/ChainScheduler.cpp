@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -65,8 +65,8 @@ TEST(ChainScheduler, Basic) {
   for (int i = 0; i < 100; i++) {
     scheduler.create_task({td::ChainScheduler<int>::ChainId{1}}, i);
   }
-  int j = 0;
-  while (j != 100) {
+  int i = 0;
+  while (i != 100) {
     td::vector<td::ChainScheduler<int>::TaskId> tasks;
     while (true) {
       auto o_task_id = scheduler.start_next_task();
@@ -78,8 +78,8 @@ TEST(ChainScheduler, Basic) {
       auto parents =
           td::transform(o_task_id.value().parents, [&](auto parent) { return *scheduler.get_task_extra(parent); });
       LOG(INFO) << "Start " << extra << parents;
-      CHECK(extra == j);
-      j++;
+      CHECK(extra == i);
+      i++;
       tasks.push_back(task_id);
     }
     for (auto &task_id : tasks) {
@@ -139,7 +139,7 @@ TEST(ChainScheduler, Stress) {
     int chain_n = rnd.fast(1, ChainsN);
     td::vector<ChainId> chain_ids(ChainsN);
     std::iota(chain_ids.begin(), chain_ids.end(), 1);
-    td::rand_shuffle(td::as_mutable_span(chain_ids), rnd);
+    td::Random::shuffle(td::as_mutable_span(chain_ids), rnd);
     chain_ids.resize(chain_n);
     for (auto chain_id : chain_ids) {
       chains[td::narrow_cast<size_t>(chain_id)].push_back(query);

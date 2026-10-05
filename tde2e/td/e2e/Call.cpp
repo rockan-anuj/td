@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -62,17 +62,17 @@ std::string lambda_serialize(F &&f) {
   return td::serialize(LambdaStorer<F>{std::forward<F>(f)});
 }
 
-void CallVerificationChain::on_new_main_block(const Blockchain &blockhain) {
+void CallVerificationChain::on_new_main_block(const Blockchain &blockchain) {
   state_ = Commit;
-  CHECK(blockhain.get_height() > height_);
-  height_ = td::narrow_cast<td::int32>(blockhain.get_height());
-  last_block_hash_ = blockhain.last_block_hash_;
+  CHECK(blockchain.get_height() > height_);
+  height_ = td::narrow_cast<td::int32>(blockchain.get_height());
+  last_block_hash_ = blockchain.last_block_hash_;
   verification_state_ = {};
   verification_state_.height = height_;
 
   verification_words_ =
       CallVerificationWords{height_, Mnemonic::generate_verification_words(last_block_hash_.as_slice())};
-  auto &group_state = *blockhain.state_.group_state_;
+  auto &group_state = *blockchain.state_.group_state_;
   committed_ = {};
   revealed_ = {};
 
@@ -597,7 +597,7 @@ td::Result<std::string> Call::create_zero_block(const PrivateKey &private_key, G
 td::Result<std::string> Call::create_self_add_block(const PrivateKey &private_key, td::Slice previous_block_server,
                                                     const GroupParticipant &self) {
   TRY_RESULT(previous_block, Blockchain::from_server_to_local(previous_block_server.str()));
-  TRY_RESULT(blockchain, ClientBlockchain::create_from_block(previous_block, private_key.to_public_key()));
+  TRY_RESULT(blockchain, ClientBlockchain::create_from_block(previous_block));
   auto old_state = *blockchain.get_group_state();
   td::remove_if(old_state.participants,
                 [&self](const GroupParticipant &participant) { return participant.user_id == self.user_id; });
@@ -618,7 +618,7 @@ td::Result<Call> Call::create(td::int64 user_id, PrivateKey private_key, td::Sli
     }
   }
   TRY_RESULT(last_block, Blockchain::from_server_to_local(last_block_server.str()));
-  TRY_RESULT(blockchain, ClientBlockchain::create_from_block(last_block, private_key.to_public_key()));
+  TRY_RESULT(blockchain, ClientBlockchain::create_from_block(last_block));
   auto call = Call(user_id, std::move(private_key), std::move(blockchain));
   TRY_STATUS(call.update_group_shared_key());
   return std::move(call);

@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -25,6 +25,7 @@
 #include "td/telegram/ChannelRecommendationManager.h"
 #include "td/telegram/ChatManager.h"
 #include "td/telegram/CommonDialogManager.h"
+#include "td/telegram/CommunityManager.h"
 #include "td/telegram/ConfigManager.h"
 #include "td/telegram/ConnectionStateManager.h"
 #include "td/telegram/CountryInfoManager.h"
@@ -37,6 +38,7 @@
 #include "td/telegram/DocumentsManager.h"
 #include "td/telegram/DownloadManager.h"
 #include "td/telegram/DownloadManagerCallback.h"
+#include "td/telegram/DraftMessageManager.h"
 #include "td/telegram/FileReferenceManager.h"
 #include "td/telegram/files/FileId.h"
 #include "td/telegram/files/FileManager.h"
@@ -60,6 +62,7 @@
 #include "td/telegram/net/NetQueryDispatcher.h"
 #include "td/telegram/net/NetStatsManager.h"
 #include "td/telegram/net/Proxy.h"
+#include "td/telegram/net/ProxyChecker.h"
 #include "td/telegram/net/TempAuthKeyWatchdog.h"
 #include "td/telegram/NotificationManager.h"
 #include "td/telegram/NotificationSettingsManager.h"
@@ -104,7 +107,9 @@
 #include "td/telegram/VideosManager.h"
 #include "td/telegram/VoiceNotesManager.h"
 #include "td/telegram/WebAppManager.h"
+#include "td/telegram/WebBrowserManager.h"
 #include "td/telegram/WebPagesManager.h"
+#include "td/telegram/WelcomeMessageManager.h"
 
 #include "td/db/binlog/BinlogEvent.h"
 
@@ -161,6 +166,9 @@ bool Td::is_authentication_request(int32 id) {
     case td_api::checkAuthenticationCode::ID:
     case td_api::registerUser::ID:
     case td_api::requestQrCodeAuthentication::ID:
+    case td_api::getAuthenticationPasskeyParameters::ID:
+    case td_api::checkAuthenticationPasskey::ID:
+    case td_api::checkAuthenticationWebToken::ID:
     case td_api::resetAuthenticationEmailAddress::ID:
     case td_api::checkAuthenticationPassword::ID:
     case td_api::requestAuthenticationPasswordRecovery::ID:
@@ -233,7 +241,6 @@ bool Td::is_preauthentication_request(int32 id) {
     case td_api::disableProxy::ID:
     case td_api::removeProxy::ID:
     case td_api::getProxies::ID:
-    case td_api::getProxyLink::ID:
     case td_api::pingProxy::ID:
     case td_api::testNetwork::ID:
       return true;
@@ -445,6 +452,7 @@ void Td::start_up() {
   inc_actor_refcnt();          // guard
 
   alarm_manager_ = create_actor<AlarmManager>("AlarmManager", create_reference());
+  proxy_checker_ = create_actor<ProxyChecker>("ProxyChecker", create_reference());
 
   CHECK(state_ == State::WaitParameters);
   for (auto &update : get_fake_current_state()) {
@@ -518,6 +526,7 @@ void Td::dec_actor_refcnt() {
       reset_manager(channel_recommendation_manager_, "ChannelRecommendationManager");
       reset_manager(chat_manager_, "ChatManager");
       reset_manager(common_dialog_manager_, "CommonDialogManager");
+      reset_manager(community_manager_, "CommunityManager");
       reset_manager(connection_state_manager_, "ConnectionStateManager");
       reset_manager(country_info_manager_, "CountryInfoManager");
       reset_manager(dialog_action_manager_, "DialogActionManager");
@@ -527,6 +536,7 @@ void Td::dec_actor_refcnt() {
       reset_manager(dialog_participant_manager_, "DialogParticipantManager");
       reset_manager(documents_manager_, "DocumentsManager");
       reset_manager(download_manager_, "DownloadManager");
+      reset_manager(draft_message_manager_, "DraftMessageManager");
       reset_manager(file_manager_, "FileManager");
       reset_manager(file_reference_manager_, "FileReferenceManager");
       reset_manager(forum_topic_manager_, "ForumTopicManager");
@@ -569,7 +579,9 @@ void Td::dec_actor_refcnt() {
       reset_manager(videos_manager_, "VideosManager");
       reset_manager(voice_notes_manager_, "VoiceNotesManager");
       reset_manager(web_app_manager_, "WebAppManager");
+      reset_manager(web_browser_manager_, "WebBrowserManager");
       reset_manager(web_pages_manager_, "WebPagesManager");
+      reset_manager(welcome_message_manager_, "WelcomeMessageManager");
 
       G()->set_option_manager(nullptr);
       option_manager_.reset();
@@ -670,6 +682,7 @@ void Td::clear() {
   reset_actor(ActorOwn<Actor>(std::move(language_pack_manager_)));
   reset_actor(ActorOwn<Actor>(std::move(net_stats_manager_)));
   reset_actor(ActorOwn<Actor>(std::move(password_manager_)));
+  reset_actor(ActorOwn<Actor>(std::move(proxy_checker_)));
   reset_actor(ActorOwn<Actor>(std::move(secure_manager_)));
   reset_actor(ActorOwn<Actor>(std::move(secret_chats_manager_)));
   reset_actor(ActorOwn<Actor>(std::move(storage_manager_)));
@@ -695,6 +708,7 @@ void Td::clear() {
   reset_actor(ActorOwn<Actor>(std::move(channel_recommendation_manager_actor_)));
   reset_actor(ActorOwn<Actor>(std::move(chat_manager_actor_)));
   reset_actor(ActorOwn<Actor>(std::move(common_dialog_manager_actor_)));
+  reset_actor(ActorOwn<Actor>(std::move(community_manager_actor_)));
   reset_actor(ActorOwn<Actor>(std::move(connection_state_manager_actor_)));
   reset_actor(ActorOwn<Actor>(std::move(country_info_manager_actor_)));
   reset_actor(ActorOwn<Actor>(std::move(dialog_action_manager_actor_)));
@@ -703,6 +717,7 @@ void Td::clear() {
   reset_actor(ActorOwn<Actor>(std::move(dialog_manager_actor_)));
   reset_actor(ActorOwn<Actor>(std::move(dialog_participant_manager_actor_)));
   reset_actor(ActorOwn<Actor>(std::move(download_manager_actor_)));
+  reset_actor(ActorOwn<Actor>(std::move(draft_message_manager_actor_)));
   reset_actor(ActorOwn<Actor>(std::move(file_manager_actor_)));
   reset_actor(ActorOwn<Actor>(std::move(file_reference_manager_actor_)));
   reset_actor(ActorOwn<Actor>(std::move(forum_topic_manager_actor_)));
@@ -744,7 +759,9 @@ void Td::clear() {
   reset_actor(ActorOwn<Actor>(std::move(video_notes_manager_actor_)));
   reset_actor(ActorOwn<Actor>(std::move(voice_notes_manager_actor_)));
   reset_actor(ActorOwn<Actor>(std::move(web_app_manager_actor_)));
+  reset_actor(ActorOwn<Actor>(std::move(web_browser_manager_actor_)));
   reset_actor(ActorOwn<Actor>(std::move(web_pages_manager_actor_)));
+  reset_actor(ActorOwn<Actor>(std::move(welcome_message_manager_actor_)));
   LOG(DEBUG) << "All actors were cleared" << timer;
 }
 
@@ -769,6 +786,7 @@ void Td::close_impl(bool destroy_flag) {
     G()->set_close_flag();
     clear_requests();
     alarm_manager_.reset();
+    proxy_checker_.reset();
     send_update(td_api::make_object<td_api::updateAuthorizationState>(
         td_api::make_object<td_api::authorizationStateClosing>()));
 
@@ -913,7 +931,7 @@ void Td::init(Parameters parameters, Result<TdDb::OpenedDatabase> r_opened_datab
 
   init_managers();
 
-  init_pure_actor_managers();
+  init_pure_actor_managers(parameters);
 
   secret_chats_manager_ =
       create_actor<SecretChatsManager>("SecretChatsManager", create_reference(), parameters.use_secret_chats_);
@@ -945,6 +963,11 @@ void Td::init(Parameters parameters, Result<TdDb::OpenedDatabase> r_opened_datab
 
 void Td::process_binlog_events(TdDb::OpenedDatabase &&events) {
   VLOG(td_init) << "Send binlog events";
+  // users and channels may contain links to communities, therefore must be inited after
+  for (auto &event : events.community_events) {
+    community_manager_->on_binlog_community_event(std::move(event));
+  }
+
   for (auto &event : events.user_events) {
     user_manager_->on_binlog_user_event(std::move(event));
   }
@@ -953,7 +976,7 @@ void Td::process_binlog_events(TdDb::OpenedDatabase &&events) {
     chat_manager_->on_binlog_channel_event(std::move(event));
   }
 
-  // chats may contain links to channels, so should be inited after
+  // chats may contain links to channels, so must be inited after
   for (auto &event : events.chat_events) {
     chat_manager_->on_binlog_chat_event(std::move(event));
   }
@@ -1035,7 +1058,6 @@ void Td::init_options_and_network() {
       case td_api::disableProxy::ID:
       case td_api::removeProxy::ID:
       case td_api::getProxies::ID:
-      case td_api::getProxyLink::ID:
         return true;
       default:
         return false;
@@ -1097,7 +1119,8 @@ void Td::init_file_manager() {
     }
 
     void reload_photo(PhotoSizeSource source, Promise<Unit> promise) final {
-      FileReferenceManager::reload_photo(std::move(source), std::move(promise));
+      send_closure(G()->file_reference_manager(), &FileReferenceManager::reload_photo, std::move(source),
+                   std::move(promise));
     }
 
     bool keep_exact_remote_location() final {
@@ -1117,7 +1140,7 @@ void Td::init_file_manager() {
   file_manager_->init_actor();
   G()->set_file_manager(file_manager_actor_.get());
 
-  file_reference_manager_ = make_unique<FileReferenceManager>(create_reference());
+  file_reference_manager_ = make_unique<FileReferenceManager>(this, create_reference());
   file_reference_manager_actor_ = register_actor("FileReferenceManager", file_reference_manager_.get());
   G()->set_file_reference_manager(file_reference_manager_actor_.get());
 }
@@ -1171,6 +1194,9 @@ void Td::init_managers() {
   G()->set_chat_manager(chat_manager_actor_.get());
   common_dialog_manager_ = make_unique<CommonDialogManager>(this, create_reference());
   common_dialog_manager_actor_ = register_actor("CommonDialogManager", common_dialog_manager_.get());
+  community_manager_ = make_unique<CommunityManager>(this, create_reference());
+  community_manager_actor_ = register_actor("CommunityManager", community_manager_.get());
+  G()->set_community_manager(community_manager_actor_.get());
   connection_state_manager_ = make_unique<ConnectionStateManager>(this, create_reference());
   connection_state_manager_actor_ = register_actor("ConnectionStateManager", connection_state_manager_.get());
   country_info_manager_ = make_unique<CountryInfoManager>(this, create_reference());
@@ -1193,6 +1219,9 @@ void Td::init_managers() {
   download_manager_ = DownloadManager::create(td::make_unique<DownloadManagerCallback>(this, create_reference()));
   download_manager_actor_ = register_actor("DownloadManager", download_manager_.get());
   G()->set_download_manager(download_manager_actor_.get());
+  draft_message_manager_ = make_unique<DraftMessageManager>(this, create_reference());
+  draft_message_manager_actor_ = register_actor("DraftMessageManager", draft_message_manager_.get());
+  G()->set_draft_message_manager(draft_message_manager_actor_.get());
   forum_topic_manager_ = make_unique<ForumTopicManager>(this, create_reference());
   forum_topic_manager_actor_ = register_actor("ForumTopicManager", forum_topic_manager_.get());
   G()->set_forum_topic_manager(forum_topic_manager_actor_.get());
@@ -1233,6 +1262,7 @@ void Td::init_managers() {
   phone_number_manager_actor_ = register_actor("PhoneNumberManager", phone_number_manager_.get());
   poll_manager_ = make_unique<PollManager>(this, create_reference());
   poll_manager_actor_ = register_actor("PollManager", poll_manager_.get());
+  G()->set_poll_manager(poll_manager_actor_.get());
   privacy_manager_ = make_unique<PrivacyManager>(this, create_reference());
   privacy_manager_actor_ = register_actor("PrivacyManager", privacy_manager_.get());
   promo_data_manager_ = make_unique<PromoDataManager>(this, create_reference());
@@ -1285,6 +1315,7 @@ void Td::init_managers() {
   G()->set_transcription_manager(transcription_manager_actor_.get());
   translation_manager_ = make_unique<TranslationManager>(this, create_reference());
   translation_manager_actor_ = register_actor("TranslationManager", translation_manager_.get());
+  G()->set_translation_manager(translation_manager_actor_.get());
   updates_manager_ = make_unique<UpdatesManager>(this, create_reference());
   updates_manager_actor_ = register_actor("UpdatesManager", updates_manager_.get());
   G()->set_updates_manager(updates_manager_actor_.get());
@@ -1298,19 +1329,26 @@ void Td::init_managers() {
   web_app_manager_ = make_unique<WebAppManager>(this, create_reference());
   web_app_manager_actor_ = register_actor("WebAppManager", web_app_manager_.get());
   G()->set_web_app_manager(web_app_manager_actor_.get());
+  web_browser_manager_ = make_unique<WebBrowserManager>(this, create_reference());
+  web_browser_manager_actor_ = register_actor("WebBrowserManager", web_browser_manager_.get());
+  G()->set_web_browser_manager(web_browser_manager_actor_.get());
   web_pages_manager_ = make_unique<WebPagesManager>(this, create_reference());
   web_pages_manager_actor_ = register_actor("WebPagesManager", web_pages_manager_.get());
   G()->set_web_pages_manager(web_pages_manager_actor_.get());
+  welcome_message_manager_ = make_unique<WelcomeMessageManager>(this, create_reference());
+  welcome_message_manager_actor_ = register_actor("WelcomeMessageManager", welcome_message_manager_.get());
+  G()->set_welcome_message_manager(welcome_message_manager_actor_.get());
 }
 
-void Td::init_pure_actor_managers() {
+void Td::init_pure_actor_managers(const Parameters &parameters) {
   cashtag_search_hints_ = create_actor<HashtagHints>("CashtagSearchHints", "cashtag_search", '$', create_reference());
   device_token_manager_ = create_actor<DeviceTokenManager>("DeviceTokenManager", create_reference());
   hashtag_hints_ = create_actor<HashtagHints>("HashtagHints", "text", '#', create_reference());
   hashtag_search_hints_ = create_actor<HashtagHints>("HashtagSearchHints", "search", '#', create_reference());
   language_pack_manager_ = create_actor<LanguagePackManager>("LanguagePackManager", create_reference());
   G()->set_language_pack_manager(language_pack_manager_.get());
-  password_manager_ = create_actor<PasswordManager>("PasswordManager", create_reference());
+  password_manager_ =
+      create_actor<PasswordManager>("PasswordManager", parameters.api_id_, parameters.api_hash_, create_reference());
   G()->set_password_manager(password_manager_.get());
   secure_manager_ = create_actor<SecureManager>("SecureManager", create_reference());
 }

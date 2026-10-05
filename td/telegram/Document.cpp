@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -25,13 +25,12 @@ vector<FileId> Document::get_file_ids(const Td *td) const {
 }
 
 void Document::append_file_ids(const Td *td, vector<FileId> &file_ids) const {
-  if (!file_id.is_valid() || empty()) {
+  if (!file_id.is_valid() || is_empty()) {
     return;
   }
 
   if (type == Type::Sticker) {
-    append(file_ids, td->stickers_manager_->get_sticker_file_ids(file_id));
-    return;
+    return td->stickers_manager_->append_sticker_file_ids(file_id, file_ids);
   }
 
   file_ids.push_back(file_id);

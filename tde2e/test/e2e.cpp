@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -169,8 +169,8 @@ TEST(CheckSharedSecret, Basic) {
   auto alice = CheckSharedSecret::create();
   auto bob = CheckSharedSecret::create();
 
-  alice.recive_commit_nonce(bob.commit_nonce()).ensure();
-  bob.recive_commit_nonce(alice.commit_nonce()).ensure();
+  alice.receive_commit_nonce(bob.commit_nonce()).ensure();
+  bob.receive_commit_nonce(alice.commit_nonce()).ensure();
 
   alice.receive_reveal_nonce(bob.reveal_nonce().move_as_ok()).ensure();
   bob.receive_reveal_nonce(alice.reveal_nonce().move_as_ok()).ensure();
@@ -590,7 +590,7 @@ struct BaselineBlockchainState {
   }
   void apply_changes(const std::vector<Change> &changes) {
     for (const auto &change_v : changes) {
-      std::visit(td::overloaded([&](const ChangeNoop &) {},
+      std::visit(td::overloaded([](const ChangeNoop &) {},
                                 [&](const ChangeSetValue &change) { key_value_state[change.key] = change.value; },
                                 [&](const ChangeSetGroupState &change) { group_state = change.group_state; },
                                 [&](const ChangeSetSharedKey &change) { shared_key = change.shared_key; }),

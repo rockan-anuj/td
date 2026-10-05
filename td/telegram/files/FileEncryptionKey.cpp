@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -16,8 +16,9 @@ namespace td {
 
 FileEncryptionKey::FileEncryptionKey(Slice key, Slice iv) : key_iv_(key.size() + iv.size(), '\0'), type_(Type::Secret) {
   if (key.size() != 32 || iv.size() != 32) {
-    LOG(ERROR) << "Wrong key/iv sizes: " << key.size() << " " << iv.size();
+    LOG(INFO) << "Wrong key/iv sizes: " << key.size() << ' ' << iv.size();
     type_ = Type::None;
+    key_iv_.clear();
     return;
   }
   CHECK(key_iv_.size() == 64);

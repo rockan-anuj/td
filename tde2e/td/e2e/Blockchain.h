@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -309,7 +309,7 @@ struct Blockchain {
 
 class ClientBlockchain {
  public:
-  static td::Result<ClientBlockchain> create_from_block(td::Slice block_slice, const PublicKey &public_key);
+  static td::Result<ClientBlockchain> create_from_block(td::Slice block_slice);
   static td::Result<ClientBlockchain> create_empty();
 
   td::Result<std::vector<Change>> try_apply_block(td::Slice block_slice);

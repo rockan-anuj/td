@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -53,7 +53,7 @@ StringBuilder &operator<<(StringBuilder &string_builder, const CurrencyAmount &a
     case CurrencyAmount::Type::Star:
       return string_builder << '[' << amount.star_amount_ << " Stars]";
     case CurrencyAmount::Type::Ton:
-      return string_builder << '[' << amount.ton_amount_ << " nanotoncoins]";
+      return string_builder << '[' << amount.ton_amount_ << " nanograms]";
     default:
       UNREACHABLE();
       return string_builder;

@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -70,6 +70,7 @@ class TdDb {
     vector<BinlogEvent> chat_events;
     vector<BinlogEvent> channel_events;
     vector<BinlogEvent> secret_chat_events;
+    vector<BinlogEvent> community_events;
     vector<BinlogEvent> web_page_events;
     vector<BinlogEvent> save_app_log_events;
     vector<BinlogEvent> to_account_manager;

@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -8,8 +8,10 @@
 
 #include "td/telegram/ChannelId.h"
 #include "td/telegram/ChatId.h"
+#include "td/telegram/CommunityId.h"
 #include "td/telegram/DialogId.h"
 #include "td/telegram/FolderId.h"
+#include "td/telegram/InputGroupCallId.h"
 #include "td/telegram/MessageContentType.h"
 #include "td/telegram/MessageFullId.h"
 #include "td/telegram/PollId.h"
@@ -36,6 +38,12 @@ class ChainId {
   }
 
   ChainId(DialogId dialog_id) : id((static_cast<uint64>(dialog_id.get()) << 10) + 10) {
+  }
+
+  ChainId(CommunityId community_id) : id((static_cast<uint64>(community_id.get()) << 10) + 10) {
+  }
+
+  ChainId(InputGroupCallId input_group_call_id) : id(input_group_call_id.get_hash()) {
   }
 
   ChainId(MessageFullId message_full_id) : ChainId(message_full_id.get_dialog_id()) {

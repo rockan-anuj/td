@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -46,7 +46,7 @@ class DcOptionsSet {
       if (ok_at > error_at && ok_at > check_at) {
         return State::Ok;
       }
-      if (check_at > ok_at && check_at > error_at) {
+      if (check_at > error_at) {
         return State::Checking;
       }
       return State::Error;

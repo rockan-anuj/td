@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -8,8 +8,11 @@
 
 #include "td/telegram/ChannelType.h"
 #include "td/telegram/ChatManager.h"
+#include "td/telegram/misc.h"
 #include "td/telegram/Td.h"
 #include "td/telegram/UserManager.h"
+
+#include "td/utils/logging.h"
 
 namespace td {
 
@@ -45,6 +48,20 @@ RequestedDialogType::RequestedDialogType(td_api::object_ptr<td_api::keyboardButt
   request_name_ = request_dialog->request_title_;
   request_username_ = request_dialog->request_username_;
   request_photo_ = request_dialog->request_photo_;
+}
+
+RequestedDialogType::RequestedDialogType(td_api::object_ptr<td_api::keyboardButtonTypeRequestManagedBot> &&request) {
+  CHECK(request != nullptr);
+  type_ = Type::CreateBot;
+  button_id_ = request->id_;
+  suggested_name_ = request->suggested_name_;
+  suggested_username_ = request->suggested_username_;
+  if (!clean_input_string(suggested_name_)) {
+    suggested_name_.clear();
+  }
+  if (!clean_input_string(suggested_username_)) {
+    suggested_username_.clear();
+  }
 }
 
 RequestedDialogType::RequestedDialogType(telegram_api::object_ptr<telegram_api::RequestPeerType> &&peer_type,
@@ -89,6 +106,20 @@ RequestedDialogType::RequestedDialogType(telegram_api::object_ptr<telegram_api::
       bot_administrator_rights_ = AdministratorRights(type->bot_admin_rights_, ChannelType::Broadcast);
       break;
     }
+    case telegram_api::requestPeerTypeCreateBot::ID: {
+      auto type = telegram_api::move_object_as<telegram_api::requestPeerTypeCreateBot>(peer_type);
+      if (type->bot_managed_) {
+        type_ = Type::CreateBot;
+        suggested_name_ = std::move(type->suggested_name_);
+        suggested_username_ = std::move(type->suggested_username_);
+      } else {
+        LOG(ERROR) << "Receive request to create an unmanaged bot " << to_string(type);
+        type_ = Type::User;
+        restrict_is_bot_ = true;
+        is_bot_ = true;
+      }
+      break;
+    }
     default:
       UNREACHABLE();
   }
@@ -99,6 +130,9 @@ td_api::object_ptr<td_api::KeyboardButtonType> RequestedDialogType::get_keyboard
     return td_api::make_object<td_api::keyboardButtonTypeRequestUsers>(
         button_id_, restrict_is_bot_, is_bot_, restrict_is_premium_, is_premium_, max_quantity_, request_name_,
         request_username_, request_photo_);
+  } else if (type_ == Type::CreateBot) {
+    return td_api::make_object<td_api::keyboardButtonTypeRequestManagedBot>(button_id_, suggested_name_,
+                                                                            suggested_username_);
   } else {
     auto user_administrator_rights = restrict_user_administrator_rights_
                                          ? user_administrator_rights_.get_chat_administrator_rights_object()
@@ -165,16 +199,27 @@ telegram_api::object_ptr<telegram_api::RequestPeerType> RequestedDialogType::get
       return telegram_api::make_object<telegram_api::requestPeerTypeBroadcast>(
           flags, is_created_, has_username_, std::move(user_admin_rights), std::move(bot_admin_rights));
     }
+    case Type::CreateBot: {
+      int32 flags = 0;
+      if (!suggested_name_.empty()) {
+        flags |= telegram_api::requestPeerTypeCreateBot::SUGGESTED_NAME_MASK;
+      }
+      if (!suggested_username_.empty()) {
+        flags |= telegram_api::requestPeerTypeCreateBot::SUGGESTED_USERNAME_MASK;
+      }
+      return telegram_api::make_object<telegram_api::requestPeerTypeCreateBot>(flags, true, suggested_name_,
+                                                                               suggested_username_);
+    }
     default:
       UNREACHABLE();
       return nullptr;
   }
 }
 
-telegram_api::object_ptr<telegram_api::inputKeyboardButtonRequestPeer>
-RequestedDialogType::get_input_keyboard_button_request_peer(const string &text) const {
-  return telegram_api::make_object<telegram_api::inputKeyboardButtonRequestPeer>(
-      0, request_name_, request_username_, request_photo_, text, button_id_, get_input_request_peer_type_object(),
+telegram_api::object_ptr<telegram_api::inputButtonTypeRequestPeer>
+RequestedDialogType::get_input_button_type_request_peer() const {
+  return telegram_api::make_object<telegram_api::inputButtonTypeRequestPeer>(
+      0, request_name_, request_username_, request_photo_, button_id_, get_input_request_peer_type_object(),
       max_quantity_);
 }
 
@@ -287,6 +332,22 @@ Status RequestedDialogType::check_shared_dialog_count(size_t count) const {
     return Status::Error(400, "Too many chats are chosen");
   }
   return Status::OK();
+}
+
+bool operator==(const RequestedDialogType &lhs, const RequestedDialogType &rhs) {
+  return lhs.type_ == rhs.type_ && lhs.button_id_ == rhs.button_id_ && lhs.max_quantity_ == rhs.max_quantity_ &&
+         lhs.restrict_is_bot_ == rhs.restrict_is_bot_ && lhs.is_bot_ == rhs.is_bot_ &&
+         lhs.restrict_is_premium_ == rhs.restrict_is_premium_ && lhs.is_premium_ == rhs.is_premium_ &&
+         lhs.request_name_ == rhs.request_name_ && lhs.request_username_ == rhs.request_username_ &&
+         lhs.request_photo_ == rhs.request_photo_ && lhs.restrict_is_forum_ == rhs.restrict_is_forum_ &&
+         lhs.is_forum_ == rhs.is_forum_ && lhs.bot_is_participant_ == rhs.bot_is_participant_ &&
+         lhs.restrict_has_username_ == rhs.restrict_has_username_ && lhs.has_username_ == rhs.has_username_ &&
+         lhs.is_created_ == rhs.is_created_ &&
+         lhs.restrict_user_administrator_rights_ == rhs.restrict_user_administrator_rights_ &&
+         lhs.restrict_bot_administrator_rights_ == rhs.restrict_bot_administrator_rights_ &&
+         lhs.user_administrator_rights_ == rhs.user_administrator_rights_ &&
+         lhs.bot_administrator_rights_ == rhs.bot_administrator_rights_ && lhs.suggested_name_ == rhs.suggested_name_ &&
+         lhs.suggested_username_ == rhs.suggested_username_;
 }
 
 }  // namespace td

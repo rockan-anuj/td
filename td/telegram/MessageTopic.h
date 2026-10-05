@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -14,6 +14,7 @@
 #include "td/telegram/telegram_api.h"
 
 #include "td/utils/common.h"
+#include "td/utils/HashTableUtils.h"
 #include "td/utils/Status.h"
 #include "td/utils/StringBuilder.h"
 
@@ -28,6 +29,8 @@ class MessageTopic {
   MessageId top_thread_message_id_;
   ForumTopicId forum_topic_id_;
   SavedMessagesTopicId saved_messages_topic_id_;
+
+  friend struct MessageTopicHash;
 
   friend bool operator==(const MessageTopic &lhs, const MessageTopic &rhs);
 
@@ -56,6 +59,8 @@ class MessageTopic {
   static Result<MessageTopic> get_message_topic(Td *td, DialogId dialog_id,
                                                 const td_api::object_ptr<td_api::MessageTopic> &topic);
 
+  static Result<MessageTopic> get_send_message_topic(Td *td, DialogId dialog_id, MessageTopic &&message_topic);
+
   static Result<MessageTopic> get_send_message_topic(Td *td, DialogId dialog_id,
                                                      const td_api::object_ptr<td_api::MessageTopic> &topic);
 
@@ -65,12 +70,18 @@ class MessageTopic {
     return type_ == Type::None;
   }
 
+  bool is_valid() const;
+
   bool is_thread() const {
     return type_ == Type::Thread;
   }
 
   bool is_forum() const {
     return type_ == Type::Forum;
+  }
+
+  bool is_forum_general() const {
+    return type_ == Type::Forum && forum_topic_id_ == ForumTopicId::general();
   }
 
   bool is_monoforum() const {
@@ -116,6 +127,34 @@ class MessageTopic {
     auto saved_input_peer = saved_messages_topic_id_.get_input_peer(td);
     CHECK(saved_input_peer != nullptr);
     return saved_input_peer;
+  }
+
+  template <class StorerT>
+  void store(StorerT &storer) const;
+
+  template <class ParserT>
+  void parse(ParserT &parser);
+};
+
+struct MessageTopicHash {
+  uint32 operator()(MessageTopic message_topic) const {
+    switch (message_topic.type_) {
+      case MessageTopic::Type::None:
+        return 0;
+      case MessageTopic::Type::Thread:
+        return combine_hashes(DialogIdHash()(message_topic.dialog_id_),
+                              MessageIdHash()(message_topic.top_thread_message_id_));
+      case MessageTopic::Type::Forum:
+        return combine_hashes(DialogIdHash()(message_topic.dialog_id_),
+                              ForumTopicIdHash()(message_topic.forum_topic_id_));
+      case MessageTopic::Type::Monoforum:
+      case MessageTopic::Type::SavedMessages:
+        return combine_hashes(DialogIdHash()(message_topic.dialog_id_),
+                              SavedMessagesTopicIdHash()(message_topic.saved_messages_topic_id_));
+      default:
+        UNREACHABLE();
+        return 0;
+    }
   }
 };
 

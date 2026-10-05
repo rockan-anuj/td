@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -370,6 +370,8 @@ void Session::send(NetQueryPtr &&query) {
   last_activity_timestamp_ = Time::now();
 
   // query->debug(PSTRING() << get_name() << ": received by Session");
+  query->set_real_dc_id(raw_dc_id_);
+  query->set_main_auth_key_id(auth_data_.get_main_auth_key().id());
   query->set_session_id(auth_data_.get_session_id());
   VLOG(net_query) << "Receive query " << query;
   if (query->update_is_ready()) {
@@ -871,10 +873,10 @@ Status Session::on_message_result_ok(mtproto::MessageId message_id, BufferSlice 
   last_success_timestamp_ = Time::now();
 
   TlParser parser(packet.as_slice());
-  int32 response_tl_id = parser.fetch_int();
 
   auto it = sent_queries_.find(message_id);
   if (it == sent_queries_.end()) {
+    int32 response_tl_id = parser.fetch_int();
     LOG(DEBUG) << "Drop result to " << message_id << tag("original_size", original_size)
                << tag("response_tl", format::as_hex(response_tl_id));
 
@@ -894,9 +896,10 @@ Status Session::on_message_result_ok(mtproto::MessageId message_id, BufferSlice 
   Query &query = it->second;
   VLOG(net_query) << "Return query result " << query.net_query_;
 
-  if (!parser.get_error()) {
+  if (!parser.get_error() && !auth_data_.get_auth_flag() && !is_cdn_) {
     // Steal authorization information.
     // It is a dirty hack, yep.
+    int32 response_tl_id = parser.fetch_int();
     if (response_tl_id == telegram_api::auth_authorization::ID ||
         response_tl_id == telegram_api::auth_loginTokenSuccess::ID ||
         response_tl_id == telegram_api::auth_sentCodeSuccess::ID) {

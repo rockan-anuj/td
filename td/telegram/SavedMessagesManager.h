@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -87,6 +87,8 @@ class SavedMessagesManager final : public Actor {
   void on_topic_reaction_count_changed(DialogId dialog_id, SavedMessagesTopicId saved_messages_topic_id, int32 count,
                                        bool is_relative);
 
+  void repair_topic_unread_reaction_count(DialogId dialog_id, SavedMessagesTopicId saved_messages_topic_id);
+
   void load_saved_messages_topics(int32 limit, Promise<Unit> &&promise);
 
   void load_monoforum_topics(DialogId dialog_id, int32 limit, Promise<Unit> &&promise);
@@ -98,6 +100,9 @@ class SavedMessagesManager final : public Actor {
 
   void get_monoforum_topic(DialogId dialog_id, SavedMessagesTopicId saved_messages_topic_id,
                            Promise<td_api::object_ptr<td_api::directMessagesChatTopic>> &&promise);
+
+  void reload_monoforum_topic(DialogId dialog_id, SavedMessagesTopicId saved_messages_topic_id,
+                              Promise<td_api::object_ptr<td_api::directMessagesChatTopic>> &&promise);
 
   void get_monoforum_topic_history(DialogId dialog_id, SavedMessagesTopicId saved_messages_topic_id,
                                    MessageId from_message_id, int32 offset, int32 limit,
@@ -288,7 +293,7 @@ class SavedMessagesManager final : public Actor {
                                      vector<telegram_api::object_ptr<telegram_api::Message>> &&messages, bool is_last,
                                      Promise<Unit> &&promise);
 
-  void on_get_saved_dialogs(TopicList *topic_list, Result<Unit> &&result);
+  void on_get_saved_dialogs(DialogId dialog_id, Result<Unit> &&result);
 
   void on_get_monoforum_topic(DialogId dialog_id, uint32 generation, SavedMessagesTopicId saved_messages_topic_id,
                               Result<Unit> &&result);
@@ -296,9 +301,6 @@ class SavedMessagesManager final : public Actor {
   void on_get_topic_history(DialogId dialog_id, uint32 generation, SavedMessagesTopicId saved_messages_topic_id,
                             MessageId from_message_id, int32 offset, int32 limit, int32 left_tries,
                             Result<MessagesInfo> &&r_info, Promise<td_api::object_ptr<td_api::messages>> &&promise);
-
-  void reload_monoforum_topic(DialogId dialog_id, SavedMessagesTopicId saved_messages_topic_id,
-                              Promise<td_api::object_ptr<td_api::directMessagesChatTopic>> &&promise);
 
   void repair_topic_unread_count(const SavedMessagesTopic *topic);
 
@@ -317,8 +319,8 @@ class SavedMessagesManager final : public Actor {
 
   void do_set_topic_unread_reaction_count(SavedMessagesTopic *topic, int32 unread_reaction_count);
 
-  void do_set_topic_draft_message(SavedMessagesTopic *topic, unique_ptr<DraftMessage> &&draft_message,
-                                  bool from_update);
+  void do_set_topic_draft_message(SavedMessagesTopic *topic, unique_ptr<DraftMessage> &&draft_message, bool from_update,
+                                  bool need_delete_files);
 
   void load_topics(TopicList *topic_list, int32 limit, Promise<Unit> &&promise);
 

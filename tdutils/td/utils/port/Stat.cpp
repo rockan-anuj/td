@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -206,7 +206,7 @@ Result<Stat> stat(CSlice path) {
   }
   return detail::from_native_stat(buf);
 #elif TD_PORT_WINDOWS
-  TRY_RESULT(fd, FileFd::open(path, FileFd::Flags::Read | FileFd::PrivateFlags::WinStat));
+  TRY_RESULT(fd, FileFd::open(path, FileFd::PrivateFlags::WinStat));
   return fd.stat();
 #endif
 }

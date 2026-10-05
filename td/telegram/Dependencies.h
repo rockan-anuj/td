@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -8,6 +8,7 @@
 
 #include "td/telegram/ChannelId.h"
 #include "td/telegram/ChatId.h"
+#include "td/telegram/CommunityId.h"
 #include "td/telegram/DialogId.h"
 #include "td/telegram/SecretChatId.h"
 #include "td/telegram/StoryFullId.h"
@@ -26,6 +27,7 @@ class Dependencies {
   FlatHashSet<ChannelId, ChannelIdHash> channel_ids;
   FlatHashSet<SecretChatId, SecretChatIdHash> secret_chat_ids;
   FlatHashSet<DialogId, DialogIdHash> dialog_ids;
+  FlatHashSet<CommunityId, CommunityIdHash> community_ids;
   FlatHashSet<WebPageId, WebPageIdHash> web_page_ids;
   FlatHashSet<StoryFullId, StoryFullIdHash> story_full_ids;
 
@@ -37,6 +39,8 @@ class Dependencies {
   void add(ChannelId channel_id);
 
   void add(SecretChatId secret_chat_id);
+
+  void add(CommunityId community_id);
 
   void add(WebPageId web_page_id);
 

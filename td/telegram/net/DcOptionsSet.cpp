@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -8,6 +8,7 @@
 
 #include "td/telegram/ConfigManager.h"
 #include "td/telegram/Global.h"
+#include "td/telegram/net/DcAuthManager.h"
 
 #include "td/actor/actor.h"
 
@@ -72,9 +73,9 @@ vector<DcOptionsSet::ConnectionInfo> DcOptionsSet::find_all_connections(DcId dc_
       continue;
     }
     if (!allow_media_only && option.is_media_only()) {
-      LOG(DEBUG) << "Skip media only option";
       continue;
     }
+    VLOG(dc) << "Have " << option;
 
     ConnectionInfo info;
     info.option = &option;
@@ -131,6 +132,12 @@ vector<DcOptionsSet::ConnectionInfo> DcOptionsSet::find_all_connections(DcId dc_
   bool have_media_only = any_of(options, [](const auto &v) { return v.option->is_media_only(); });
   if (have_media_only) {
     td::remove_if(options, [](auto &v) { return !v.option->is_media_only(); });
+  }
+
+  for (const auto &option : options) {
+    VLOG(dc) << "Found" << (option.use_http ? " HTTP" : "") << " option with order " << option.order << ", ok in "
+             << (Time::now() - option.stat->ok_at) << ", error in " << (Time::now() - option.stat->error_at)
+             << ", check in " << (Time::now() - option.stat->check_at) << ": " << *option.option;
   }
 
   return options;

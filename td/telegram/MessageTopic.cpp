@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -209,8 +209,11 @@ Result<MessageTopic> MessageTopic::get_message_topic(Td *td, DialogId dialog_id,
 
 Result<MessageTopic> MessageTopic::get_send_message_topic(Td *td, DialogId dialog_id,
                                                           const td_api::object_ptr<td_api::MessageTopic> &topic_id) {
-  TRY_RESULT(message_topic, MessageTopic::get_message_topic(td, dialog_id, topic_id));
+  TRY_RESULT(message_topic, get_message_topic(td, dialog_id, topic_id));
+  return get_send_message_topic(td, dialog_id, std::move(message_topic));
+}
 
+Result<MessageTopic> MessageTopic::get_send_message_topic(Td *td, DialogId dialog_id, MessageTopic &&message_topic) {
   // topic is required in administered direct messages chats
   if (td->dialog_manager_->is_admined_monoforum_channel(dialog_id) && !message_topic.is_monoforum()) {
     return Status::Error(400, "Channel direct messages topic must be specified");
@@ -221,16 +224,27 @@ Result<MessageTopic> MessageTopic::get_send_message_topic(Td *td, DialogId dialo
     return MessageTopic();
   }
 
-  // sending to the general topic must be done implicitly
-  if (message_topic.is_general_forum()) {
-    return MessageTopic();
-  }
-
   if (message_topic.is_saved_messages()) {
     return Status::Error(400, "Messages can't be explicitly sent to a Saved Messages topic");
   }
 
   return std::move(message_topic);
+}
+
+bool MessageTopic::is_valid() const {
+  switch (type_) {
+    case Type::None:
+      return false;
+    case Type::Thread:
+      return dialog_id_.is_valid() && top_thread_message_id_.is_valid();
+    case Type::Forum:
+      return dialog_id_.is_valid() && forum_topic_id_.is_valid();
+    case Type::Monoforum:
+    case Type::SavedMessages:
+      return dialog_id_.is_valid() && saved_messages_topic_id_.is_valid();
+    default:
+      return false;
+  }
 }
 
 td_api::object_ptr<td_api::MessageTopic> MessageTopic::get_message_topic_object(Td *td) const {

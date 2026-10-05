@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -185,7 +185,7 @@ Block Block::from_tl(const e2e::e2e_chain_block &block) {
   }
   result.signature_ = Signature::from_u512(block.signature_);
   result.prev_block_hash_ = block.prev_block_hash_;
-  auto change_from_tl = [&](auto &obj) {
+  auto change_from_tl = [](auto &obj) {
     return Change::from_tl(*obj);
   };
   result.changes_ = td::transform(block.changes_, change_from_tl);
@@ -233,10 +233,20 @@ td::StringBuilder &operator<<(td::StringBuilder &sb, const Block &block) {
             << "\tsignature_key=" << block.o_signature_public_key_ << ")";
 }
 
-td::Result<BitString> key_to_bitstring(td::Slice key) {
+static td::Result<td::UInt256> as_key(td::Slice key) {
   if (key.size() != 32) {
     return td::Status::Error("Invalid key size");
   }
+  td::UInt256 key_int256;
+  key_int256.as_mutable_slice().copy_from(key);
+  if (key_int256.is_zero()) {
+    return td::Status::Error("Invalid zero key");
+  }
+  return key_int256;
+}
+
+static td::Result<BitString> key_to_bitstring(td::Slice key) {
+  TRY_STATUS(as_key(key));
   return BitString(key);
 }
 
@@ -693,18 +703,6 @@ td::int64 Blockchain::get_height() const {
   return last_block_.height_;
 }
 
-td::Result<td::UInt256> as_key(td::Slice key) {
-  if (key.size() != 32) {
-    return td::Status::Error("Invalid key size");
-  }
-  td::UInt256 key_int256;
-  key_int256.as_mutable_slice().copy_from(key);
-  if (key_int256.is_zero()) {
-    return td::Status::Error("Invalid zero key");
-  }
-  return key_int256;
-}
-
 td::Result<Blockchain> Blockchain::create_from_block(Block block, td::optional<td::Slice> o_snapshot) {
   if (block.height_ < 0) {
     return Error(E::InvalidBlock, "negative height");
@@ -761,7 +759,7 @@ td::Result<std::string> Blockchain::from_local_to_server(std::string block) {
   return block;
 }
 
-td::Result<ClientBlockchain> ClientBlockchain::create_from_block(td::Slice block_slice, const PublicKey &public_key) {
+td::Result<ClientBlockchain> ClientBlockchain::create_from_block(td::Slice block_slice) {
   TRY_RESULT(block, Block::from_tl_serialized(block_slice));
   TRY_RESULT(blockchain, Blockchain::create_from_block(std::move(block)));
   ClientBlockchain res;
@@ -785,7 +783,7 @@ td::Result<std::vector<Change>> ClientBlockchain::try_apply_block(td::Slice bloc
   for (auto &change : block.changes_) {
     if (std::holds_alternative<ChangeSetValue>(change.value)) {
       auto &change_value = std::get<ChangeSetValue>(change.value);
-      auto key = as_key(change_value.key).move_as_ok();  // already verified in try_apply_block
+      TRY_RESULT(key, as_key(change_value.key));
       map_[key] = Entry{block.height_, change_value.value};
     }
   }

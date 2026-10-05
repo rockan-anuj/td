@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -29,8 +29,6 @@ class DialogNotificationSettings {
   bool use_default_show_preview = true;
   bool use_default_mute_stories = true;
   bool use_default_hide_story_sender = true;
-  bool is_use_default_fixed = true;
-  bool is_secret_chat_show_preview_fixed = false;
   bool is_synchronized = false;
 
   // local settings
